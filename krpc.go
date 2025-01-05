@@ -56,7 +56,7 @@ func (tm *tokenManager) token(addr *net.UDPAddr) string {
 	v, ok := tm.Get(addr.IP.String())
 	tk, _ := v.(token)
 
-	if !ok || time.Now().Sub(tk.createTime) > tm.expiredAfter {
+	if !ok || time.Since(tk.createTime) > tm.expiredAfter {
 		tk = token{
 			data:       randomString(5),
 			createTime: time.Now(),
@@ -70,11 +70,11 @@ func (tm *tokenManager) token(addr *net.UDPAddr) string {
 
 // clear removes expired tokens.
 func (tm *tokenManager) clear() {
-	for _ = range time.Tick(time.Minute * 3) {
+	for range time.Tick(time.Minute * 3) {
 		keys := make([]interface{}, 0, 100)
 
 		for item := range tm.Iter() {
-			if time.Now().Sub(item.val.(token).createTime) > tm.expiredAfter {
+			if time.Since(item.val.(token).createTime) > tm.expiredAfter {
 				keys = append(keys, item.key)
 			}
 		}
@@ -302,19 +302,13 @@ func (tm *transactionManager) query(q *query, try int) {
 
 // run starts to listen and consume the query chan.
 func (tm *transactionManager) run() {
-	var q *query
-
-	for {
-		select {
-		case q = <-tm.queryChan:
-			go tm.query(q, tm.dht.Try)
-		}
+	for q := range tm.queryChan {
+		go tm.query(q, tm.dht.Try)
 	}
 }
 
 // sendQuery send query-formed data to the chan.
-func (tm *transactionManager) sendQuery(
-	no *node, queryType string, a map[string]interface{}) {
+func (tm *transactionManager) sendQuery(no *node, queryType string, a map[string]interface{}) {
 
 	// If the target is self, then stop.
 	if no.id != nil && no.id.RawString() == tm.dht.node.id.RawString() ||
@@ -350,19 +344,6 @@ func (tm *transactionManager) getPeers(no *node, infoHash string) {
 	tm.sendQuery(no, getPeersType, map[string]interface{}{
 		"id":        tm.dht.id(infoHash),
 		"info_hash": infoHash,
-	})
-}
-
-// announcePeer sends announce_peer query to the chan.
-func (tm *transactionManager) announcePeer(
-	no *node, infoHash string, impliedPort, port int, token string) {
-
-	tm.sendQuery(no, announcePeerType, map[string]interface{}{
-		"id":           tm.dht.id(no.id.RawString()),
-		"info_hash":    infoHash,
-		"implied_port": impliedPort,
-		"port":         port,
-		"token":        token,
 	})
 }
 
@@ -422,8 +403,7 @@ func parseMessage(data interface{}) (map[string]interface{}, error) {
 }
 
 // handleRequest handles the requests received from udp.
-func handleRequest(dht *DHT, addr *net.UDPAddr,
-	response map[string]interface{}) (success bool) {
+func handleRequest(dht *DHT, addr *net.UDPAddr, response map[string]interface{}) (success bool) {
 
 	t, ok := response["t"].(string)
 	if !ok {
@@ -553,8 +533,7 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 			send(dht, addr, makeResponse(t, map[string]interface{}{
 				"id":    dht.id(infoHash),
 				"token": dht.tokenManager.token(addr),
-				"nodes": strings.Join(dht.routingTable.GetNeighborCompactInfos(
-					newBitmapFromString(infoHash), dht.K), ""),
+				"nodes": strings.Join(dht.routingTable.GetNeighborCompactInfos(newBitmapFromString(infoHash), dht.K), ""),
 			}))
 		}
 
@@ -585,7 +564,6 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 		}
 
 		if !dht.tokenManager.check(addr, token) {
-			//			send(dht, addr, makeError(t, protocolError, "invalid token"))
 			return
 		}
 
@@ -636,8 +614,7 @@ func findOn(dht *DHT, r map[string]interface{}, target *bitmap,
 
 	hasNew, found := false, false
 	for i := 0; i < len(nodes)/26; i++ {
-		no, _ := newNodeFromCompactInfo(
-			string(nodes[i*26:(i+1)*26]), dht.Network)
+		no, _ := newNodeFromCompactInfo(string(nodes[i*26:(i+1)*26]), dht.Network)
 
 		if no.id.RawString() == target.RawString() {
 			found = true
@@ -736,8 +713,7 @@ func handleResponse(dht *DHT, addr *net.UDPAddr,
 					dht.OnGetPeersResponse(infoHash, p)
 				}
 			}
-		} else if findOn(
-			dht, r, newBitmapFromString(infoHash), getPeersType) != nil {
+		} else if findOn(dht, r, newBitmapFromString(infoHash), getPeersType) != nil {
 			return
 		}
 	case announcePeerType:
@@ -766,9 +742,7 @@ func handleError(dht *DHT, addr *net.UDPAddr,
 		return
 	}
 
-	if trans := dht.transactionManager.filterOne(
-		response["t"].(string), addr); trans != nil {
-
+	if trans := dht.transactionManager.filterOne(response["t"].(string), addr); trans != nil {
 		trans.response <- struct{}{}
 	}
 
