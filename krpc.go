@@ -281,7 +281,7 @@ func (tm *transactionManager) query(q *query, try int) {
 	defer tm.delete(trans.id)
 
 	success := false
-	for i := 0; i < try; i++ {
+	for i := 0; i < try && !success; i++ {
 		if err := send(tm.dht, q.node.addr, q.data); err != nil {
 			break
 		}
@@ -289,7 +289,6 @@ func (tm *transactionManager) query(q *query, try int) {
 		select {
 		case <-trans.response:
 			success = true
-			break
 		case <-time.After(time.Second * 15):
 		}
 	}
