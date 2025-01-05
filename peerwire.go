@@ -201,8 +201,7 @@ func (wire *Wire) isDone(pieces [][]byte) bool {
 	return true
 }
 
-func (wire *Wire) requestPieces(
-	conn *net.TCPConn, utMetadata int, metadataSize int, piecesNum int) {
+func (wire *Wire) requestPieces(conn *net.TCPConn, utMetadata int, metadataSize int, piecesNum int) {
 
 	buffer := make([]byte, 1024)
 	for i := 0; i < piecesNum; i++ {
