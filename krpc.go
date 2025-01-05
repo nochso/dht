@@ -425,7 +425,10 @@ func parseMessage(data interface{}) (map[string]interface{}, error) {
 func handleRequest(dht *DHT, addr *net.UDPAddr,
 	response map[string]interface{}) (success bool) {
 
-	t := response["t"].(string)
+	t, ok := response["t"].(string)
+	if !ok {
+		return
+	}
 
 	if err := ParseKeys(
 		response, [][]string{{"q", "string"}, {"a", "map"}}); err != nil {
@@ -434,15 +437,24 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 		return
 	}
 
-	q := response["q"].(string)
-	a := response["a"].(map[string]interface{})
+	q, ok := response["q"].(string)
+	if !ok {
+		return
+	}
+	a, ok := response["a"].(map[string]interface{})
+	if !ok {
+		return
+	}
 
 	if err := ParseKey(a, "id", "string"); err != nil {
 		send(dht, addr, makeError(t, protocolError, err.Error()))
 		return
 	}
 
-	id := a["id"].(string)
+	id, ok := a["id"].(string)
+	if !ok {
+		return
+	}
 
 	if id == dht.node.id.RawString() {
 		return
@@ -475,7 +487,10 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 				return
 			}
 
-			target := a["target"].(string)
+			target, ok := a["target"].(string)
+			if !ok {
+				return
+			}
 			if len(target) != 20 {
 				send(dht, addr, makeError(t, protocolError, "invalid target"))
 				return
@@ -505,7 +520,10 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 			return
 		}
 
-		infoHash := a["info_hash"].(string)
+		infoHash, ok := a["info_hash"].(string)
+		if !ok {
+			return
+		}
 
 		if len(infoHash) != 20 {
 			send(dht, addr, makeError(t, protocolError, "invalid info_hash"))
@@ -553,9 +571,18 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 			return
 		}
 
-		infoHash := a["info_hash"].(string)
-		port := a["port"].(int)
-		token := a["token"].(string)
+		infoHash, ok := a["info_hash"].(string)
+		if !ok {
+			return
+		}
+		port, ok := a["port"].(int)
+		if !ok {
+			return
+		}
+		token, ok := a["token"].(string)
+		if !ok {
+			return
+		}
 
 		if !dht.tokenManager.check(addr, token) {
 			//			send(dht, addr, makeError(t, protocolError, "invalid token"))
@@ -584,7 +611,10 @@ func handleRequest(dht *DHT, addr *net.UDPAddr,
 		return
 	}
 
-	no, _ := newNode(id, addr.Network(), addr.String())
+	no, err := newNode(id, addr.Network(), addr.String())
+	if err != nil {
+		return
+	}
 	dht.routingTable.Insert(no)
 	return true
 }
